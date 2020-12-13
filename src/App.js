@@ -1,4 +1,3 @@
-import logo from './logo.svg';
 import React, { useRef, useState, Component } from 'react';
 import './App.css';
 import SpeakerPhoneIcon from '@material-ui/icons/SpeakerPhone';
@@ -12,7 +11,10 @@ import { useCollectionData } from 'react-firebase-hooks/firestore';
 
 ///initialize firebase from config
 import { firebaseConfig } from './config';
-firebase.initializeApp(firebaseConfig);
+if (!firebase.apps.length) {
+  firebase.initializeApp(firebaseConfig);
+}
+
 
 const firestore = firebase.firestore();
 
@@ -20,7 +22,7 @@ class App extends Component {
   
   state = {
     uid: 1,
-    listMsg: []
+    showChatBox: false
   }
 
   constructor(props) {
@@ -31,28 +33,27 @@ class App extends Component {
     this.setState({
       uid: user
     },()=> {
-      console.log(this.state)
+      //console.log(this.state.uid)
     })
+  }
+
+  showChatBox = () => {
+    const show = this.state.showChatBox
+    if(!show){
+      this.setState({showChatBox: !show});
+    }
+  }
+
+  hideChatBox = () => {
+    const show = this.state.showChatBox
+    if(show){
+      this.setState({showChatBox: !show});
+    }
   }
 
   render() {
     return (
       <div className="App">
-        {/* <header className="App-header">
-          <img src={logo} className="App-logo" alt="logo" />
-          <p>
-            Edit <code>src/App.js</code> and save to reload.
-          </p>
-          <a
-            className="App-link"
-            href="https://reactjs.org"
-            target="_blank"
-            rel="noopener noreferrer"
-          >
-            Learn React
-          </a>
-        </header> */}
-  
         <div id="center-text">
           <h2>ChatBox UI</h2>
           <p>Message send and scrool to bottom enabled </p>
@@ -62,19 +63,19 @@ class App extends Component {
         </div>
   
         <div id="body">
-          <div id="chat-circle" className="btn btn-raised">
+          <div id="chat-circle" className={`btn btn-raised ${this.state.showChatBox ? 'hidden':'show'}`} onClick={this.showChatBox}>
             <div id="chat-overlay"></div>
             <SpeakerPhoneIcon />
           </div>
-          <ChatRoom uid = {this.state.uid}/>
+          <ChatRoom uid = {this.state.uid} close = {this.hideChatBox} showChatBox = {this.state.showChatBox}/>
         </div>
       </div>
     );
   }
 }
 
-function ChatRoom(uid) {
-  const dummy = useRef();
+function ChatRoom(props) {
+  const ref = useRef();
   const messagesRef = firestore.collection('messages');
   const query = messagesRef.orderBy('createdAt').limit(25);
 
@@ -85,27 +86,30 @@ function ChatRoom(uid) {
 
   const sendMessage = async (e) => {
     e.preventDefault();
-    console.log(uid);
     await messagesRef.add({
       text: formValue,
       createdAt: firebase.firestore.FieldValue.serverTimestamp(),
-      uid: uid
+      uid: props.uid
     })
 
     setFormValue('');
-    dummy.current.scrollIntoView({ behavior: 'smooth' });
+    ref.current.scrollIntoView({ behavior: 'smooth' });
+  }
+
+  const onClose = () => {
+    props.close()
   }
 
   return (<>
-    <div className="chat-box">
+    <div className={`chat-box ${props.showChatBox ? 'show':'hide'}`}>
       <div className="chat-box-header">
         ChatBot
-        <span className="chat-box-toggle"><CloseIcon/></span>
+        <span className="chat-box-toggle" onClick={onClose}><CloseIcon/></span>
       </div>
       <div className="chat-box-body">
         <div className="chat-logs">
-          {messages && messages.map(msg => <ChatMessage key={msg.id} message={msg} uid={uid}/>)}
-          <span ref={dummy}></span>
+          {messages && messages.map(msg => <ChatMessage key={msg.id} message={msg} uid={props.uid}/>)}
+          <span ref={ref}></span>
         </div>
       </div>
       <div className="chat-input">    
@@ -121,10 +125,7 @@ function ChatRoom(uid) {
 
 function ChatMessage(props) {
   const { text, uid } = props.message;
-  console.log(uid.uid);
-  console.log(props.uid);
-
-  const messageClass = uid.uid === props.uid.uid ? 'sent' : 'received';
+  const messageClass = uid === props.uid ? 'sent' : 'received';
 
   return (<>
     <div className={`message ${messageClass}`}>
